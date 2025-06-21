@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Disaster Response Platform</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    h2 { margin-top: 2em; }
+    form, .section { margin-bottom: 2em; }
+    label { display: block; margin-top: 0.5em; }
+    input, textarea, select { width: 100%; margin-bottom: 0.5em; }
+    .log { font-size: 0.9em; color: #555; }
+    .item { border: 1px solid #ccc; padding: 1em; margin-bottom: 1em; }
+    .priority { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Disaster Response Platform (Minimal Frontend)</h1>
+
+  <div class="section">
+    <h2>Create Disaster</h2>
+    <form id="create-disaster-form">
+      <label>Title <input name="title" required></label>
+      <label>Location Name <input name="location_name"></label>
+      <label>Description <textarea name="description"></textarea></label>
+      <label>Tags (comma separated) <input name="tags"></label>
+      <button type="submit">Create</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Disasters</h2>
+    <button onclick="fetchDisasters()">Refresh</button>
+    <div id="disasters-list"></div>
+  </div>
+
+  <div class="section">
+    <h2>Submit Report</h2>
+    <form id="report-form">
+      <label>Disaster ID <input name="disaster_id" required></label>
+      <label>Content <input name="content" required></label>
+      <label>Image URL <input name="image_url"></label>
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Reports</h2>
+    <button onclick="fetchReports()">Refresh</button>
+    <div id="reports-list"></div>
+  </div>
+
+  <div class="section">
+    <h2>Geocode Location</h2>
+    <form id="geocode-form">
+      <label>Text <input name="text" required></label>
+      <button type="submit">Geocode</button>
+    </form>
+    <div id="geocode-result"></div>
+  </div>
+
+  <div class="section">
+    <h2>Verify Image</h2>
+    <form id="verify-image-form">
+      <label>Disaster ID <input name="disaster_id" required></label>
+      <label>Image URL <input name="image_url" required></label>
+      <button type="submit">Verify</button>
+    </form>
+    <div id="verify-result"></div>
+  </div>
+
+  <div class="section">
+    <h2>Resources (by Disaster & Location)</h2>
+    <form id="resources-form">
+      <label>Disaster ID <input name="disaster_id" required></label>
+      <label>Latitude <input name="lat" required></label>
+      <label>Longitude <input name="lon" required></label>
+      <button type="submit">Find Resources</button>
+    </form>
+    <div id="resources-list"></div>
+  </div>
+
+  <div class="section">
+    <h2>Mock Social Media</h2>
+    <button onclick="fetchSocialMedia()">Fetch</button>
+    <div id="social-media-list"></div>
+  </div>
+
+  <div class="section">
+    <h2>Official Updates</h2>
+    <form id="official-updates-form">
+      <label>Disaster ID <input name="disaster_id" required></label>
+      <button type="submit">Fetch Updates</button>
+    </form>
+    <div id="official-updates-list"></div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000';
+    const USER_ID = 'netrunnerX'; // Change as needed for testing roles
+    const headers = { 'Content-Type': 'application/json', 'x-user-id': USER_ID };
+
+    // Disaster CRUD
+    async function fetchDisasters() {
+      const res = await fetch(`${API}/disasters`, { headers });
+      const data = await res.json();
+      const el = document.getElementById('disasters-list');
+      el.innerHTML = data.map(d => `
+        <div class="item">
+          <b>${d.title}</b> (${d.id})<br>
+          <i>${d.location_name}</i><br>
+          Tags: ${d.tags?.join(', ')}<br>
+          Owner: ${d.owner_id}<br>
+          <span class="log">${d.description}</span>
+        </div>
+      `).join('');
+    }
+    fetchDisasters();
+
+    document.getElementById('create-disaster-form').onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      body.tags = body.tags ? body.tags.split(',').map(t => t.trim()) : [];
+      const res = await fetch(`${API}/disasters`, {
+        method: 'POST', headers, body: JSON.stringify(body)
+      });
+      e.target.reset();
+      fetchDisasters();
+    };
+
+    // Reports
+    async function fetchReports() {
+      const res = await fetch(`${API}/reports`, { headers });
+      const data = await res.json();
+      const el = document.getElementById('reports-list');
+      el.innerHTML = data.map(r => `
+        <div class="item">
+          Disaster: ${r.disaster_id}<br>
+          User: ${r.user_id}<br>
+          <span class="${/urgent|sos/i.test(r.content) ? 'priority' : ''}">${r.content}</span><br>
+          Image: <a href="${r.image_url}" target="_blank">${r.image_url}</a><br>
+          Status: ${r.verification_status}
+        </div>
+      `).join('');
+    }
+    fetchReports();
+
+    document.getElementById('report-form').onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await fetch(`${API}/reports`, {
+        method: 'POST', headers, body: JSON.stringify(body)
+      });
+      e.target.reset();
+      fetchReports();
+    };
+
+    // Geocode
+    document.getElementById('geocode-form').onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await fetch(`${API}/geocode`, {
+        method: 'POST', headers, body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      document.getElementById('geocode-result').innerText = JSON.stringify(data, null, 2);
+    };
+
+    // Verify Image
+    document.getElementById('verify-image-form').onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await fetch(`${API}/disasters/${body.disaster_id}/verify-image`, {
+        method: 'POST', headers, body: JSON.stringify({ image_url: body.image_url })
+      });
+      const data = await res.json();
+      document.getElementById('verify-result').innerText = JSON.stringify(data, null, 2);
+    };
+
+    // Resources
+    document.getElementById('resources-form').onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await fetch(`${API}/disasters/${body.disaster_id}/resources?lat=${body.lat}&lon=${body.lon}`, { headers });
+      const data = await res.json();
+      document.getElementById('resources-list').innerText = JSON.stringify(data, null, 2);
+    };
+
+    // Social Media
+    async function fetchSocialMedia() {
+      const res = await fetch(`${API}/mock-social-media`, { headers });
+      const data = await res.json();
+      const el = document.getElementById('social-media-list');
+      el.innerHTML = data.posts.map(p => `
+        <div class="item ${/urgent|sos/i.test(p.post) ? 'priority' : ''}"># ${p.user}: ${p.post}</div>
+      `).join('');
+    }
+
+    // Official Updates
+    document.getElementById('official-updates-form').onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await fetch(`${API}/disasters/${body.disaster_id}/official-updates`, { headers });
+      const data = await res.json();
+      document.getElementById('official-updates-list').innerText = JSON.stringify(data, null, 2);
+    };
+
+    // Real-time updates
+    const socket = io(API);
+    socket.on('disaster_updated', fetchDisasters);
+    socket.on('report_updated', fetchReports);
+    socket.on('resources_updated', () => {
+      // Optionally refresh resources if you want
+    });
+  </script>
+</body>
+</html> 
