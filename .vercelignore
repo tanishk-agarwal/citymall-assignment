@@ -1,0 +1,21 @@
+# Backend files (not needed for Vercel static deployment)
+index.js
+package.json
+package-lock.json
+node_modules/
+
+# Environment variables (secrets)
+.env
+.env.*
+
+# Backend dependencies and config
+supabase/
+*.log
+
+# Development files
+.DS_Store
+.vscode/
+.idea/
+
+# Keep only frontend files for Vercel
+# Vercel will serve files in public/ directory 
